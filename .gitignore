@@ -1,0 +1,24 @@
+# Ignore Python bytecode files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore the virtual environment
+.venv/
+venv/
+env/
+
+# Ignore IDE and editor-specific files
+.idea/
+.vscode/
+
+# Ignore operating system files
+.DS_Store
+Thumbs.db
+
+# Ignore the encrypted and uploaded folders (if not necessary for GitHub)
+uploads/
+encrypted/
+
+# Ignore any other configuration or logs
+*.log
