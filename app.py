@@ -1,97 +1,91 @@
-from flask import Flask, render_template, request, send_file
 import cv2
-import numpy as np
 import os
+import numpy as np
+from flask import Flask, render_template, request, send_file
 
 app = Flask(__name__)
-UPLOAD_FOLDER = "static/uploads"
-ENCODED_FOLDER = "static/encoded"
 
-# Ensure directories exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(ENCODED_FOLDER, exist_ok=True)
+UPLOAD_FOLDER = "static/uploads/"
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-# ASCII Mapping for Encoding & Decoding
+password_store = {}  # Dictionary to store passwords for images
+
 d = {chr(i): i for i in range(255)}
 c = {i: chr(i) for i in range(255)}
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
 
 @app.route("/encrypt", methods=["POST"])
 def encrypt():
-    if "image" not in request.files or request.form["message"] == "" or request.form["password"] == "":
-        return "Error: Missing fields"
+    if "image" not in request.files:
+        return "No image uploaded", 400
 
-    # Read inputs
-    image_file = request.files["image"]
-    message = request.form["message"]
+    file = request.files["image"]
+    msg = request.form["message"]
     password = request.form["password"]
 
-    image_path = os.path.join(UPLOAD_FOLDER, image_file.filename)
-    encoded_path = os.path.join(ENCODED_FOLDER, "encrypted_" + image_file.filename)
+    if file.filename == "":
+        return "No selected file", 400
 
-    image_file.save(image_path)  # Save the uploaded image
-    img = cv2.imread(image_path)  # Read image using OpenCV
+    filepath = os.path.join(UPLOAD_FOLDER, "encrypted.jpg")
+    img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
 
     if img is None:
-        return "Error: Unable to read image."
+        return "Invalid image format", 400
 
-    # Encrypt message length
-    message_length = len(message)
-    img[0, 0, 0] = message_length // 256
-    img[0, 0, 1] = message_length % 256
+    # Store password for this image
+    password_store[filepath] = password
 
-    # Encrypt message into image
-    n, m, z = 0, 1, 2  # Start from (0,1) to avoid length data
-    for char in message:
-        if n < img.shape[0] and m < img.shape[1]:
-            img[n, m, z] = d[char]
-            n += 1
-            m += 1
-            z = (z + 1) % 3
+    n, m, z = 0, 0, 0
+    for i in range(len(msg)):
+        img[n, m, z] = d[msg[i]]
+        n += 1
+        m += 1
+        z = (z + 1) % 3
 
-    cv2.imwrite(encoded_path, img)  # Save the encrypted image
-    return send_file(encoded_path, as_attachment=True)
-
+    cv2.imwrite(filepath, img)
+    return send_file(filepath, as_attachment=True)
 
 @app.route("/decrypt", methods=["POST"])
 def decrypt():
-    if "image" not in request.files or request.form["password"] == "":
-        return "Error: Missing fields"
+    if "image" not in request.files:
+        return "No image uploaded", 400
 
-    # Read inputs
-    image_file = request.files["image"]
+    file = request.files["image"]
     input_password = request.form["password"]
 
-    image_path = os.path.join(UPLOAD_FOLDER, "to_decrypt_" + image_file.filename)
-    image_file.save(image_path)  # Save uploaded encrypted image
-    img = cv2.imread(image_path)
-
+    img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
     if img is None:
-        return "Error: Unable to read image."
+        return "Invalid image format", 400
 
-    # Read message length
-    try:
-        msg_length = (int(img[0, 0, 0]) * 256) + int(img[0, 0, 1])
-    except IndexError:
-        return "Error: Unable to read message length from image."
+    filepath = os.path.join(UPLOAD_FOLDER, "encrypted.jpg")
 
-    # Decrypt message
+    # Check if password exists for this image
+    if filepath not in password_store:
+        return "YOU ARE NOT AUTHORIZED!", 403
+
+    stored_password = password_store[filepath]
+
+    # Validate password
+    if input_password != stored_password:
+        return "YOU ARE NOT AUTHORIZED!", 403
+
+    n, m, z = 0, 0, 0
     message = ""
-    n, m, z = 0, 1, 2  # Start from (0,1) to avoid length data
 
-    for _ in range(msg_length):  # Extract only the stored message length
-        if n < img.shape[0] and m < img.shape[1]:
-            message += c[img[n, m, z]]
-            n += 1
-            m += 1
-            z = (z + 1) % 3
-        else:
-            return "Error: Image size is too small to contain the full message."
+    for _ in range(255):  # Attempt to retrieve up to 255 characters
+        char_code = img[n, m, z]
+        if char_code == 0:
+            break
+        message += c[char_code]
+        n += 1
+        m += 1
+        z = (z + 1) % 3
 
-    return message
+    return f"Decrypted Message: {message}"
 
 if __name__ == "__main__":
     app.run(debug=True)
