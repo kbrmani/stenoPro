@@ -3,47 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steganography Tool</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Image Encryption & Decryption</title>
+   <link rel="stylesheet" href="/statics/styles.css">
 </head>
 <body>
+
     <div class="container">
-        <h1>Image Steganography</h1>
-
-        
-        <h2>Encrypt Message</h2>
-        <form action="/" method="post" enctype="multipart/form-data">
-            <label for="file">Upload Image:</label>
-            <input type="file" name="file" required>
-            
-            <label for="message">Secret Message:</label>
-            <input type="text" name="message" id="message" required>
-            
-            <label for="password">Password:</label>
-            <input type="password" name="password" required>
-            
-            <button type="submit" name="action" value="encrypt">Encrypt & Download</button>
+        <h2>🔐 Image Encryption</h2>
+        <form id="encrypt-form" action="/encrypt" method="post" enctype="multipart/form-data">
+            <input type="file" name="image" required>
+            <input type="text" name="message" placeholder="Enter Secret Message" required>
+            <input type="password" name="password" placeholder="Enter Passcode" required>
+            <button type="submit">Encrypt & Download</button>
         </form>
-
-       
-        <h2>Decrypt Message</h2>
-        <form action="/" method="post" enctype="multipart/form-data">
-            <label for="file">Upload Encrypted Image:</label>
-            <input type="file" name="file" required>
-            
-            <label for="password">Password:</label>
-            <input type="password" name="password" required>
-            
-            <button type="submit" name="action" value="decrypt">Decrypt</button>
-        </form>
-
-        
-        {% if decrypted_message %}
-            <div class="message-box">
-                <h3>Decrypted Message:</h3>
-                <p>{{ decrypted_message }}</p>
-            </div>
-        {% endif %}
     </div>
+
+    <br>
+
+    <div class="container">
+        <h2>🔓 Image Decryption</h2>
+        <form id="decrypt-form" action="/decrypt" method="post" enctype="multipart/form-data">
+            <input type="file" name="image" required>
+            <input type="password" name="password" placeholder="Enter Passcode" required>
+            <button type="submit">Decrypt</button>
+        </form>
+        <p id="decrypted-message"></p>
+    </div>
+
+    <script>
+        document.getElementById("encrypt-form").onsubmit = function() {
+            setTimeout(() => {
+                document.getElementById("encrypt-form").reset();
+            }, 500);
+        };
+
+        document.getElementById("decrypt-form").onsubmit = async function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const response = await fetch("/decrypt", {
+                method: "POST",
+                body: formData
+            });
+            const message = await response.text();
+            document.getElementById("decrypted-message").textContent = "Decrypted Message: " + message;
+            this.reset();
+        };
+    </script>
+
 </body>
 </html>
